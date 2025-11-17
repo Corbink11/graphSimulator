@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Graph Generator</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        button {
+            font-size: 16px;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #btnNoCycle {
+            background-color: #28a745;
+        }
+        #btnNoCycle:hover {
+            background-color: #218838;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        /* Cytoscape container */
+        #cy {
+            width: 100%;
+            height: 500px;
+            min-width: 400px;
+            flex-grow: 1;
+            border-right: 1px solid #eee;
+        }
+        /* Info container */
+        #info {
+            width: 300px;
+            min-width: 250px;
+            padding: 20px;
+            box-sizing: border-box;
+            background-color: #f9f9f9;
+        }
+        #info h2 {
+            margin-top: 0;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        #info-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        #info-list li {
+            font-size: 14px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        #info-list li:last-child {
+            border-bottom: none;
+        }
+        #info-list li b {
+            color: #333;
+        }
+
+        /* Responsive layout for smaller screens */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            #cy {
+                border-right: none;
+                border-bottom: 1px solid #eee;
+                height: 400px;
+            }
+            #info {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Graph Generator</h1>
+
+    <div class="controls">
+        <button id="btnWithCycle">Generate with Cycle</button>
+        <button id="btnNoCycle">Generate without Cycle (Tree)</button>
+    </div>
+
+    <div class="container">
+        <div id="cy"></div>
+        
+        <div id="info">
+            <h2>Graph Characteristics</h2>
+            <ul id="info-list">
+                <li>Click a button to generate a graph.</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Wait for the DOM to be fully loaded before running script
+        document.addEventListener("DOMContentLoaded", function() {
+
+            // Get references to our HTML elements
+            const btnWithCycle = document.getElementById('btnWithCycle');
+            const btnNoCycle = document.getElementById('btnNoCycle');
+            const infoList = document.getElementById('info-list');
+
+            // Initialize Cytoscape
+            let cy = cytoscape({
+                container: document.getElementById('cy'), // container to render in
+                style: [ // stylesheet for the graph
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#007bff',
+                            'label': 'data(id)'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'line-color': '#ccc',
+                            'target-arrow-color': '#ccc',
+                            'target-arrow-shape': 'none', // No arrows for undirected graph
+                            'curve-style': 'bezier'
+                        }
+                    }
+                ],
+                layout: {
+                    name: 'cose', // 'cose' layout is good for general graphs
+                    padding: 10
+                }
+            });
+
+            // --- Event Listeners ---
+            
+            btnWithCycle.addEventListener('click', () => {
+                generateGraph(true); // Generate with a cycle
+            });
+
+            btnNoCycle.addEventListener('click', () => {
+                generateGraph(false); // Generate without a cycle
+            });
+
+            /**
+             * Main function to generate and analyze the graph
+             * @param {boolean} createCycle - If true, adds extra edges to guarantee a cycle.
+             */
+            function generateGraph(createCycle = false) {
+                // Clear the old graph
+                cy.elements().remove();
+                
+                // 1. Generate a base tree (which has no cycles)
+                const numNodes = Math.floor(Math.random() * 8) + 7; // 7-14 nodes
+                let nodes = [];
+                let edges = [];
+
+                // Add first node
+                nodes.push({ group: 'nodes', data: { id: 'n0' } });
+
+                // Add remaining nodes, each connecting to a random *existing* node
+                for (let i = 1; i < numNodes; i++) {
+                    const targetNodeId = 'n' + Math.floor(Math.random() * i);
+                    const newNodeId = 'n' + i;
+                    
+                    nodes.push({ group: 'nodes', data: { id: newNodeId } });
+                    edges.push({ 
+                        group: 'edges', 
+                        data: { 
+                            id: `e${i-1}`, 
+                            source: newNodeId, 
+                            target: targetNodeId 
+                        } 
+                    });
+                }
+                
+                // Add all nodes and edges to the graph
+                cy.add(nodes);
+                cy.add(edges);
+
+                // 2. If createCycle is true, add 1-3 extra edges
+                if (createCycle) {
+                    const extraEdges = Math.floor(Math.random() * 3) + 1; // 1-3 extra edges
+                    for (let i = 0; i < extraEdges; i++) {
+                        let n1_id, n2_id, node1, node2;
+                        
+                        // Keep trying until we find two nodes that are not already connected
+                        do {
+                            n1_id = 'n' + Math.floor(Math.random() * numNodes);
+                            n2_id = 'n' + Math.floor(Math.random() * numNodes);
+                            node1 = cy.getElementById(n1_id);
+                            node2 = cy.getElementById(n2_id);
+                        } while (
+                            n1_id === n2_id || // Don't allow self-loops
+                            node1.edgesWith(node2).length > 0 // Check if edge already exists
+                        );
+
+                        // Add the new edge that creates a cycle
+                        cy.add({
+                            group: 'edges',
+                            data: { id: `e_extra_${i}`, source: n1_id, target: n2_id }
+                        });
+                    }
+                }
+
+                // 3. Run the layout
+                cy.layout({ name: 'cose', animate: true, padding: 30 }).run();
+                
+                // 4. Analyze the final graph
+                analyzeGraph();
+            }
+
+            /**
+             * Analyzes the current graph in the 'cy' object and displays its properties.
+             */
+            function analyzeGraph() {
+                // Clear previous analysis
+                infoList.innerHTML = '';
+
+                // Get graph elements
+                const nodes = cy.nodes();
+                const edges = cy.edges();
+                
+                // --- Basic Stats ---
+                addInfo(`<b>Nodes:</b> ${nodes.length}`);
+                addInfo(`<b>Edges:</b> ${edges.length}`);
+
+                // --- Connectivity ---
+                // .components() finds all disconnected sets of nodes
+                const components = cy.elements().components();
+                const isConnected = components.length === 1;
+                addInfo(`<b>Connected Components:</b> ${components.length}`);
+                addInfo(`<b>Graph is connected:</b> ${isConnected ? 'Yes' : 'No'}`);
+
+                // --- Cycle Detection ---
+                // A graph (or forest) is acyclic if E = V - C
+                // (Edges = Vertices - Components)
+                // If E > V - C, it MUST have a cycle.
+                const hasCycle = edges.length > nodes.length - components.length;
+                
+                addInfo(`<b>Has cycle:</b> ${hasCycle ? 'Yes' : 'No'}`);
+                
+                // --- Specific Graph Types ---
+                if (!hasCycle && isConnected) {
+                    addInfo(`<b>Type:</b> This is a <b>Tree</b>.`);
+                } else if (!hasCycle && !isConnected) {
+                    addInfo(`<b>Type:</b> This is a <b>Forest</b>.`);
+                }
+
+                // --- Euler Circuits/Paths ---
+                // An Euler circuit exists if:
+                // 1. The graph is connected.
+                // 2. Every node has an even degree.
+                // An Euler path exists if:
+                // 1. The graph is connected.
+                // 2. Exactly two nodes have an odd degree.
+                
+                let oddDegreeNodes = 0;
+                nodes.forEach(node => {
+                    // .degree() gets the number of edges connected to the node
+                    if (node.degree(false) % 2 !== 0) { // 'false' for undirected degree
+                        oddDegreeNodes++;
+                    }
+                });
+
+                addInfo(`<b>Nodes with odd degree:</b> ${oddDegreeNodes}`);
+
+                if (isConnected && oddDegreeNodes === 0) {
+                    addInfo(`<b>Characteristic:</b> Has an <b>Euler Circuit</b>.`);
+                } else if (isConnected && oddDegreeNodes === 2) {
+                    addInfo(`<b>Characteristic:</b> Has an <b>Euler Path</b>.`);
+                } else {
+                    addInfo(`<b>Characteristic:</b> No Euler Circuit or Path.`);
+                }
+            }
+
+            /**
+             * Helper function to add a line item to the info list.
+             * @param {string} text - The HTML content to add.
+             */
+            function addInfo(text) {
+                const li = document.createElement('li');
+                li.innerHTML = text;
+                infoList.appendChild(li);
+            }
+
+            // Generate an initial graph on load
+            generateGraph(false);
+        });
+    </script>
+
+</body>
+</html>
